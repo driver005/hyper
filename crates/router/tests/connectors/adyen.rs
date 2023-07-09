@@ -70,6 +70,10 @@ impl AdyenTest {
                 card_cvc: Secret::new(card_cvc.to_string()),
                 card_issuer: None,
                 card_network: None,
+                card_type: None,
+                card_issuing_country: None,
+                bank_code: None,
+                nick_name: Some(masking::Secret::new("nick_name".into())),
             }),
             confirm: true,
             statement_descriptor_suffix: None,
@@ -257,7 +261,7 @@ async fn should_make_payment() {
         )
         .await
         .unwrap();
-    assert_eq!(authorize_response.status, enums::AttemptStatus::Pending);
+    assert_eq!(authorize_response.status, enums::AttemptStatus::Charged);
 }
 
 // Refunds a payment using the automatic capture flow (Non 3DS).

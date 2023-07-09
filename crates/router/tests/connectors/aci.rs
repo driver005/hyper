@@ -42,6 +42,10 @@ fn construct_payment_router_data() -> types::PaymentsAuthorizeRouterData {
                 card_cvc: Secret::new("999".to_string()),
                 card_issuer: None,
                 card_network: None,
+                card_type: None,
+                card_issuing_country: None,
+                bank_code: None,
+                nick_name: Some(masking::Secret::new("nick_name".into())),
             }),
             confirm: true,
             statement_descriptor_suffix: None,
@@ -98,7 +102,7 @@ fn construct_refund_router_data<F>() -> types::RefundsRouterData<F> {
         description: Some("This is a test".to_string()),
         return_url: None,
         request: types::RefundsData {
-            amount: 1000,
+            payment_amount: 1000,
             currency: enums::Currency::USD,
 
             refund_id: uuid::Uuid::new_v4().to_string(),
@@ -148,6 +152,7 @@ async fn payments_create_success() {
         connector_integration,
         &request,
         payments::CallConnectorAction::Trigger,
+        None,
     )
     .await
     .unwrap();
@@ -186,6 +191,10 @@ async fn payments_create_failure() {
                 card_cvc: Secret::new("99".to_string()),
                 card_issuer: None,
                 card_network: None,
+                card_type: None,
+                card_issuing_country: None,
+                bank_code: None,
+                nick_name: Some(masking::Secret::new("nick_name".into())),
             });
 
         let response = services::api::execute_connector_processing_step(
@@ -193,6 +202,7 @@ async fn payments_create_failure() {
             connector_integration,
             &request,
             payments::CallConnectorAction::Trigger,
+            None,
         )
         .await
         .is_err();
@@ -225,6 +235,7 @@ async fn refund_for_successful_payments() {
         connector_integration,
         &request,
         payments::CallConnectorAction::Trigger,
+        None,
     )
     .await
     .unwrap();
@@ -250,6 +261,7 @@ async fn refund_for_successful_payments() {
         connector_integration,
         &refund_request,
         payments::CallConnectorAction::Trigger,
+        None,
     )
     .await
     .unwrap();
@@ -285,6 +297,7 @@ async fn refunds_create_failure() {
         connector_integration,
         &request,
         payments::CallConnectorAction::Trigger,
+        None,
     )
     .await
     .is_err();

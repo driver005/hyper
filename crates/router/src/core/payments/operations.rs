@@ -69,8 +69,9 @@ pub trait Operation<F: Clone, T>: Send + std::fmt::Debug {
 pub struct ValidateResult<'a> {
     pub merchant_id: &'a str,
     pub payment_id: api::PaymentIdType,
-    pub mandate_type: Option<api::MandateTxnType>,
+    pub mandate_type: Option<api::MandateTransactionType>,
     pub storage_scheme: enums::MerchantStorageScheme,
+    pub requeue: bool,
 }
 
 #[allow(clippy::type_complexity)]
@@ -90,8 +91,9 @@ pub trait GetTracker<F, D, R>: Send {
         state: &'a AppState,
         payment_id: &api::PaymentIdType,
         request: &R,
-        mandate_type: Option<api::MandateTxnType>,
+        mandate_type: Option<api::MandateTransactionType>,
         merchant_account: &domain::MerchantAccount,
+        mechant_key_store: &domain::MerchantKeyStore,
     ) -> RouterResult<(BoxedOperation<'a, F, R>, D, Option<CustomerDetails>)>;
 }
 
@@ -103,7 +105,7 @@ pub trait Domain<F: Clone, R>: Send + Sync {
         db: &dyn StorageInterface,
         payment_data: &mut PaymentData<F>,
         request: Option<CustomerDetails>,
-        merchant_id: &str,
+        merchant_key_store: &domain::MerchantKeyStore,
     ) -> CustomResult<(BoxedOperation<'a, F, R>, Option<domain::Customer>), errors::StorageError>;
 
     #[allow(clippy::too_many_arguments)]
@@ -118,6 +120,8 @@ pub trait Domain<F: Clone, R>: Send + Sync {
         &'a self,
         _db: &'a AppState,
         _payment_attempt: &storage::PaymentAttempt,
+        _requeue: bool,
+        _schedule_time: Option<time::PrimitiveDateTime>,
     ) -> CustomResult<(), errors::ApiErrorResponse> {
         Ok(())
     }
@@ -128,19 +132,21 @@ pub trait Domain<F: Clone, R>: Send + Sync {
         state: &AppState,
         request: &R,
         payment_intent: &storage::payment_intent::PaymentIntent,
+        mechant_key_store: &domain::MerchantKeyStore,
     ) -> CustomResult<api::ConnectorChoice, errors::ApiErrorResponse>;
 }
 
 #[async_trait]
+#[allow(clippy::too_many_arguments)]
 pub trait UpdateTracker<F, D, Req>: Send {
     async fn update_trackers<'b>(
         &'b self,
         db: &dyn StorageInterface,
-        payment_id: &api::PaymentIdType,
         payment_data: D,
         customer: Option<domain::Customer>,
         storage_scheme: enums::MerchantStorageScheme,
         updated_customer: Option<storage::CustomerUpdate>,
+        mechant_key_store: &domain::MerchantKeyStore,
     ) -> RouterResult<(BoxedOperation<'b, F, Req>, D)>
     where
         F: 'b + Send;
@@ -172,7 +178,7 @@ where
         db: &dyn StorageInterface,
         payment_data: &mut PaymentData<F>,
         _request: Option<CustomerDetails>,
-        merchant_id: &str,
+        merchant_key_store: &domain::MerchantKeyStore,
     ) -> CustomResult<
         (
             BoxedOperation<'a, F, api::PaymentsRetrieveRequest>,
@@ -185,8 +191,9 @@ where
             helpers::get_customer_from_details(
                 db,
                 payment_data.payment_intent.customer_id.clone(),
-                merchant_id,
+                &merchant_key_store.merchant_id,
                 payment_data,
+                merchant_key_store,
             )
             .await?,
         ))
@@ -198,6 +205,7 @@ where
         state: &AppState,
         _request: &api::PaymentsRetrieveRequest,
         _payment_intent: &storage::payment_intent::PaymentIntent,
+        _merchant_key_store: &domain::MerchantKeyStore,
     ) -> CustomResult<api::ConnectorChoice, errors::ApiErrorResponse> {
         helpers::get_connector_default(state, None).await
     }
@@ -228,7 +236,7 @@ where
         db: &dyn StorageInterface,
         payment_data: &mut PaymentData<F>,
         _request: Option<CustomerDetails>,
-        merchant_id: &str,
+        merchant_key_store: &domain::MerchantKeyStore,
     ) -> CustomResult<
         (
             BoxedOperation<'a, F, api::PaymentsCaptureRequest>,
@@ -241,8 +249,9 @@ where
             helpers::get_customer_from_details(
                 db,
                 payment_data.payment_intent.customer_id.clone(),
-                merchant_id,
+                &merchant_key_store.merchant_id,
                 payment_data,
+                merchant_key_store,
             )
             .await?,
         ))
@@ -266,6 +275,7 @@ where
         state: &AppState,
         _request: &api::PaymentsCaptureRequest,
         _payment_intent: &storage::payment_intent::PaymentIntent,
+        _merchant_key_store: &domain::MerchantKeyStore,
     ) -> CustomResult<api::ConnectorChoice, errors::ApiErrorResponse> {
         helpers::get_connector_default(state, None).await
     }
@@ -283,7 +293,7 @@ where
         db: &dyn StorageInterface,
         payment_data: &mut PaymentData<F>,
         _request: Option<CustomerDetails>,
-        merchant_id: &str,
+        merchant_key_store: &domain::MerchantKeyStore,
     ) -> CustomResult<
         (
             BoxedOperation<'a, F, api::PaymentsCancelRequest>,
@@ -296,8 +306,9 @@ where
             helpers::get_customer_from_details(
                 db,
                 payment_data.payment_intent.customer_id.clone(),
-                merchant_id,
+                &merchant_key_store.merchant_id,
                 payment_data,
+                merchant_key_store,
             )
             .await?,
         ))
@@ -322,6 +333,7 @@ where
         state: &AppState,
         _request: &api::PaymentsCancelRequest,
         _payment_intent: &storage::payment_intent::PaymentIntent,
+        _merchant_key_store: &domain::MerchantKeyStore,
     ) -> CustomResult<api::ConnectorChoice, errors::ApiErrorResponse> {
         helpers::get_connector_default(state, None).await
     }

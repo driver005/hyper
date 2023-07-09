@@ -36,6 +36,12 @@ pub struct PaymentIntent {
     pub active_attempt_id: String,
     pub business_country: storage_enums::CountryAlpha2,
     pub business_label: String,
+    #[diesel(deserialize_as = super::OptionalDieselArray<pii::SecretSerdeValue>)]
+    pub order_details: Option<Vec<pii::SecretSerdeValue>>,
+    pub allowed_payment_method_types: Option<serde_json::Value>,
+    pub connector_metadata: Option<serde_json::Value>,
+    pub feature_metadata: Option<serde_json::Value>,
+    pub attempt_count: i16,
 }
 
 #[derive(
@@ -78,6 +84,12 @@ pub struct PaymentIntentNew {
     pub active_attempt_id: String,
     pub business_country: storage_enums::CountryAlpha2,
     pub business_label: String,
+    #[diesel(deserialize_as = super::OptionalDieselArray<pii::SecretSerdeValue>)]
+    pub order_details: Option<Vec<pii::SecretSerdeValue>>,
+    pub allowed_payment_method_types: Option<serde_json::Value>,
+    pub connector_metadata: Option<serde_json::Value>,
+    pub feature_metadata: Option<serde_json::Value>,
+    pub attempt_count: i16,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -116,6 +128,11 @@ pub enum PaymentIntentUpdate {
         return_url: Option<String>,
         business_country: Option<storage_enums::CountryAlpha2>,
         business_label: Option<String>,
+        description: Option<String>,
+        statement_descriptor_name: Option<String>,
+        statement_descriptor_suffix: Option<String>,
+        order_details: Option<Vec<pii::SecretSerdeValue>>,
+        metadata: Option<pii::SecretSerdeValue>,
     },
     PaymentAttemptUpdate {
         active_attempt_id: String,
@@ -123,6 +140,7 @@ pub enum PaymentIntentUpdate {
     StatusAndAttemptUpdate {
         status: storage_enums::IntentStatus,
         active_attempt_id: String,
+        attempt_count: i16,
     },
 }
 
@@ -146,6 +164,12 @@ pub struct PaymentIntentUpdateInternal {
     pub active_attempt_id: Option<String>,
     pub business_country: Option<storage_enums::CountryAlpha2>,
     pub business_label: Option<String>,
+    pub description: Option<String>,
+    pub statement_descriptor_name: Option<String>,
+    pub statement_descriptor_suffix: Option<String>,
+    #[diesel(deserialize_as = super::OptionalDieselArray<pii::SecretSerdeValue>)]
+    pub order_details: Option<Vec<pii::SecretSerdeValue>>,
+    pub attempt_count: Option<i16>,
 }
 
 impl PaymentIntentUpdate {
@@ -173,6 +197,7 @@ impl PaymentIntentUpdate {
                 .shipping_address_id
                 .or(source.shipping_address_id),
             modified_at: common_utils::date_time::now(),
+            order_details: internal_update.order_details.or(source.order_details),
             ..source
         }
     }
@@ -192,6 +217,11 @@ impl From<PaymentIntentUpdate> for PaymentIntentUpdateInternal {
                 return_url,
                 business_country,
                 business_label,
+                description,
+                statement_descriptor_name,
+                statement_descriptor_suffix,
+                order_details,
+                metadata,
             } => Self {
                 amount: Some(amount),
                 currency: Some(currency),
@@ -205,6 +235,11 @@ impl From<PaymentIntentUpdate> for PaymentIntentUpdateInternal {
                 return_url,
                 business_country,
                 business_label,
+                description,
+                statement_descriptor_name,
+                statement_descriptor_suffix,
+                order_details,
+                metadata,
                 ..Default::default()
             },
             PaymentIntentUpdate::MetadataUpdate { metadata } => Self {
@@ -271,9 +306,11 @@ impl From<PaymentIntentUpdate> for PaymentIntentUpdateInternal {
             PaymentIntentUpdate::StatusAndAttemptUpdate {
                 status,
                 active_attempt_id,
+                attempt_count,
             } => Self {
                 status: Some(status),
                 active_attempt_id: Some(active_attempt_id),
+                attempt_count: Some(attempt_count),
                 ..Default::default()
             },
         }

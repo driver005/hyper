@@ -62,6 +62,13 @@ pub trait PaymentAttemptInterface {
         merchant_id: &str,
         storage_scheme: enums::MerchantStorageScheme,
     ) -> CustomResult<types::PaymentAttempt, errors::StorageError>;
+
+    async fn get_filters_for_payments(
+        &self,
+        pi: &[storage_models::payment_intent::PaymentIntent],
+        merchant_id: &str,
+        storage_scheme: enums::MerchantStorageScheme,
+    ) -> CustomResult<storage_models::payment_attempt::PaymentListFilters, errors::StorageError>;
 }
 
 #[cfg(not(feature = "kv_store"))]
@@ -177,6 +184,20 @@ mod storage {
             .into_report()
         }
 
+        async fn get_filters_for_payments(
+            &self,
+            pi: &[storage_models::payment_intent::PaymentIntent],
+            merchant_id: &str,
+            _storage_scheme: enums::MerchantStorageScheme,
+        ) -> CustomResult<storage_models::payment_attempt::PaymentListFilters, errors::StorageError>
+        {
+            let conn = connection::pg_connection_read(self).await?;
+            PaymentAttempt::get_filters_for_payments(&conn, pi, merchant_id)
+                .await
+                .map_err(Into::into)
+                .into_report()
+        }
+
         async fn find_payment_attempt_by_preprocessing_id_merchant_id(
             &self,
             preprocessing_id: &str,
@@ -221,6 +242,16 @@ impl PaymentAttemptInterface for MockDb {
         _storage_scheme: enums::MerchantStorageScheme,
     ) -> CustomResult<types::PaymentAttempt, errors::StorageError> {
         // [#172]: Implement function for `MockDb`
+        Err(errors::StorageError::MockDbError)?
+    }
+
+    async fn get_filters_for_payments(
+        &self,
+        _pi: &[storage_models::payment_intent::PaymentIntent],
+        _merchant_id: &str,
+        _storage_scheme: enums::MerchantStorageScheme,
+    ) -> CustomResult<storage_models::payment_attempt::PaymentListFilters, errors::StorageError>
+    {
         Err(errors::StorageError::MockDbError)?
     }
 
@@ -303,6 +334,7 @@ impl PaymentAttemptInterface for MockDb {
             straight_through_algorithm: payment_attempt.straight_through_algorithm,
             mandate_details: payment_attempt.mandate_details,
             preprocessing_step_id: payment_attempt.preprocessing_step_id,
+            error_reason: payment_attempt.error_reason,
         };
         payment_attempts.push(payment_attempt.clone());
         Ok(payment_attempt)
@@ -440,6 +472,7 @@ mod storage {
                             .clone(),
                         mandate_details: payment_attempt.mandate_details.clone(),
                         preprocessing_step_id: payment_attempt.preprocessing_step_id.clone(),
+                        error_reason: payment_attempt.error_reason.clone(),
                     };
 
                     let field = format!("pa_{}", created_attempt.attempt_id);
@@ -795,6 +828,20 @@ mod storage {
                     .await
                 }
             }
+        }
+
+        async fn get_filters_for_payments(
+            &self,
+            pi: &[storage_models::payment_intent::PaymentIntent],
+            merchant_id: &str,
+            _storage_scheme: enums::MerchantStorageScheme,
+        ) -> CustomResult<storage_models::payment_attempt::PaymentListFilters, errors::StorageError>
+        {
+            let conn = connection::pg_connection_read(self).await?;
+            PaymentAttempt::get_filters_for_payments(&conn, pi, merchant_id)
+                .await
+                .map_err(Into::into)
+                .into_report()
         }
     }
 

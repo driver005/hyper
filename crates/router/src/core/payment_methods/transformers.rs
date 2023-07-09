@@ -241,11 +241,7 @@ pub async fn mk_add_card_request_hs(
     customer_id: &str,
     merchant_id: &str,
 ) -> CustomResult<services::Request, errors::VaultError> {
-    let merchant_customer_id = if cfg!(feature = "sandbox") {
-        format!("{customer_id}::{merchant_id}")
-    } else {
-        customer_id.to_owned()
-    };
+    let merchant_customer_id = customer_id.to_owned();
     let card = Card {
         card_number: card.card_number.to_owned(),
         name_on_card: card.card_holder_name.to_owned(),
@@ -253,7 +249,7 @@ pub async fn mk_add_card_request_hs(
         card_exp_year: card.card_exp_year.to_owned(),
         card_brand: None,
         card_isin: None,
-        nick_name: None,
+        nick_name: card.nick_name.to_owned().map(masking::Secret::expose),
     };
     let store_card_req = StoreCardReq {
         merchant_id,
@@ -302,6 +298,7 @@ pub fn mk_add_card_response_hs(
         card_token: None,       // [#256]
         card_fingerprint: None, // fingerprint not send by basilisk-hs need to have this feature in case we need it in future
         card_holder_name: card.card_holder_name,
+        nick_name: card.nick_name,
     };
     api::PaymentMethodResponse {
         merchant_id: merchant_id.to_owned(),
@@ -335,6 +332,7 @@ pub fn mk_add_card_response(
         card_token: Some(response.external_id.into()), // [#256]
         card_fingerprint: Some(response.card_fingerprint),
         card_holder_name: card.card_holder_name,
+        nick_name: card.nick_name,
     };
     api::PaymentMethodResponse {
         merchant_id: merchant_id.to_owned(),
@@ -359,7 +357,7 @@ pub fn mk_add_card_request(
     locker_id: &str,
     merchant_id: &str,
 ) -> CustomResult<services::Request, errors::VaultError> {
-    let customer_id = if cfg!(feature = "sandbox") {
+    let customer_id = if cfg!(feature = "release") {
         format!("{customer_id}::{merchant_id}")
     } else {
         customer_id.to_owned()
@@ -398,11 +396,7 @@ pub async fn mk_get_card_request_hs(
     merchant_id: &str,
     card_reference: &str,
 ) -> CustomResult<services::Request, errors::VaultError> {
-    let merchant_customer_id = if cfg!(feature = "sandbox") {
-        format!("{customer_id}::{merchant_id}")
-    } else {
-        customer_id.to_owned()
-    };
+    let merchant_customer_id = customer_id.to_owned();
     let card_req_body = CardReqBody {
         merchant_id,
         merchant_customer_id,
@@ -482,11 +476,7 @@ pub async fn mk_delete_card_request_hs(
     merchant_id: &str,
     card_reference: &str,
 ) -> CustomResult<services::Request, errors::VaultError> {
-    let merchant_customer_id = if cfg!(feature = "sandbox") {
-        format!("{customer_id}::{merchant_id}")
-    } else {
-        customer_id.to_owned()
-    };
+    let merchant_customer_id = customer_id.to_owned();
     let card_req_body = CardReqBody {
         merchant_id,
         merchant_customer_id,
@@ -567,6 +557,7 @@ pub fn get_card_detail(
         card_token: None,
         card_fingerprint: None,
         card_holder_name: response.name_on_card,
+        nick_name: response.nick_name.map(masking::Secret::new),
     };
     Ok(card_detail)
 }
